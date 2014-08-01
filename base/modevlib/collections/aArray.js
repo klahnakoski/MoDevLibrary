@@ -40,7 +40,10 @@ importScript("../util/aUtil.js");
 
 
 	Array.prototype.copy = function(){
-		return this.slice(0);
+		//http://jsperf.com/new-array-vs-splice-vs-slice/19
+		var i = this.length;
+		while(i--) { b[i] = this[i]; }
+		return b;
 	};//method
 
 
@@ -237,22 +240,34 @@ importScript("../util/aUtil.js");
 	//ASSUMES THAT THE COORCED STRING VALUE IS UNIQUE
 	//EXPECTING EACH ARGUMENT TO BE AN ARRAY THAT REPRESENTS A SET
 	Array.prototype.union = function(){
-		return Array.union.apply(Array, [].appendArray(arguments).append(this));
+		return Array.union.apply(undefined, [].appendArray(arguments).append(this));
 	};//method
 
 	//RETURN UNION OF UNIQUE VALUES
 	//ASSUMES THAT THE COORCED STRING VALUE IS UNIQUE
 	//EXPECTING ONE ARGUMENT, WHICH IS A LIST OF AN ARRAYS, EACH REPRESENTING A SET
-	Array.union = function union(arrays){
+	Array.union = function union(){
+		var arrays = (arguments.length==1  && arguments[0] instanceof Array) ? arguments[0] : arguments;
+
 		var output={};
-		arrays.forall(function(a){
-			a = Array.newInstance(a);
-			for(var i = a.length; i--;){
+		for (var j = arrays.length; j--;) {
+			var a = Array.newInstance(arrays[j]);
+			for (var i = a.length; i--;) {
 				var v = a[i];
-				output[v]=v;
+				output[v] = v;
 			}//for
-		});
+		}//for
 		return Map.getValues(output);
+	};
+
+	Array.extend=function extend(){
+		var arrays = (arguments.length==1  && arguments[0] instanceof Array) ? arguments[0] : arguments;
+		var output=[];
+		for(var i=0;i<arrays.length;i++){
+			var a = Array.newInstance(arrays[i]);
+			output.appendArray(a);
+		}//for
+		return output;
 	};
 
 

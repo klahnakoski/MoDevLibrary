@@ -21,6 +21,7 @@ build = function () {
 	}//endif
 
 	var DEBUG = false;
+	var POPUP_ON_ERROR = true;
 	var FIRST_BLOCK_TIME = 500;	//TIME UNTIL YIELD
 	var NEXT_BLOCK_TIME = 150;	//THE MAXMIMUM TIME (ms) A PIECE OF CODE SHOULD HOG THE MAIN THREAD
 	var YIELD = {"name": "yield"};  //BE COOPERATIVE, WILL PAUSE EVERY MAX_TIME_BLOCK MILLISECONDS
@@ -93,11 +94,11 @@ build = function () {
 	};//method
 
 
-	//FEELING LUCKY?  MAYBE THIS GENERATOR WILL NOT DELAY AND RETURN A VALID VALUE BEFORE IT BLOCKS
+	//FEELING LUCKY?  MAYBE THIS GENERATOR WILL NOT DELAY AND RETURN A VALID VALUE BEFORE IT YIELDS
 	//YOU CAN HAVE IT BLOCK THE MAIN TREAD FOR time MILLISECONDS
 	Thread.runSynchronously = function (gen, time) {
 		if (String(gen) !== '[object Generator]') {
-			Log.error("You can not pass a function.  Pass a generator! (have function use the yield keyword instead)");
+			Log.error("You can not pass a function.  Pass a generator!");
 		}//endif
 
 		var thread = new Thread(gen);
@@ -137,13 +138,13 @@ build = function () {
 		Thread.isRunning.push(this);
 		this.parentThread = Thread.currentThread;
 		this.parentThread.children.push(this);
-		Thread.showWorking();
+		Thread.showWorking(Thread.isRunning.length);
 		return this.resume(this.stack.pop());
 	};
 
 
 	function Thread_prototype_resume(retval) {
-		Thread.showWorking();
+		Thread.showWorking(Thread.isRunning.length);
 		while (this.keepRunning) {
 			if (retval === YIELD) {
 				if (this.nextYield < currentTimestamp()) {
@@ -287,7 +288,11 @@ build = function () {
 		}//endif
 
 		if (retval instanceof Exception) {
-			Log.alert("Uncaught Error in thread: " + (this.name !== undefined ? this.name : "") + "\n  " + retval.toString());
+			if (POPUP_ON_ERROR || DEBUG){
+				Log.alert("Uncaught Error in thread: " + (this.name !== undefined ? this.name : "") + "\n  " + retval.toString());
+			}else{
+				Log.warning("Uncaught Error in thread: " + (this.name !== undefined ? this.name : "") + "\n  ", retval);
+			}//endif
 		}//endif
 
 		return {"threadResponse": retval};
@@ -343,7 +348,9 @@ build = function () {
 				//WE WILL SIMPLY MAKE THE JOINING THREAD LOOK LIKE THE otherThread's CALLER
 				//(WILL ALSO PACKAGE ANY EXCEPTIONS THAT ARE THROWN FROM otherThread)
 				var resumeWhenDone = yield(Thread.Resume);
-				var gen = Thread_join_resume(resumeWhenDone);
+				var gen = Thread_join_resume(function(retval){
+					resumeWhenDone(retval);
+				});
 				gen.next();  //THE FIRST CALL TO next()
 				otherThread.stack.unshift(gen);
 				yield (Thread.suspend());
@@ -369,6 +376,12 @@ build = function () {
 		try {
 			result = yield(undefined);
 		} catch (e) {
+			if (POPUP_ON_ERROR || DEBUG){
+				Log.alert("Uncaught Error in thread: " + (this.name !== undefined ? this.name : "") + "\n  " + e.toString());
+			}else{
+				Log.warning("Uncaught Error in thread: " + (this.name !== undefined ? this.name : "") + "\n  ", e);
+			}//endif
+
 			result = e
 		}//try
 		resumeFunction({"threadResponse": result});  //PACK TO HIDE EXCEPTION

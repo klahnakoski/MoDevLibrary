@@ -35,12 +35,12 @@ importScript("../aFormat.js");
 
 GUI = {};
 (function () {
-
 		GUI.state = {};
 		GUI.customFilters = [];
 
+		$(".loading").hide();
 
-		Thread.showWorking = function() {
+		Thread.showWorking = function(numThread) {
 			var l = $(".loading");
 			l.show();
 		};//function
@@ -138,7 +138,7 @@ GUI = {};
 			Thread.run("show last updated timestamp", function*() {
 				var time;
 
-				if (indexName === undefined || indexName == "bugs") {
+				if (indexName === undefined || indexName == null || indexName == "bugs") {
 					var result = yield (ESQuery.run({
 						"from": "bugs",
 						"select": {"name": "max_date", "value": "modified_ts", "aggregate": "maximum"},
@@ -146,7 +146,9 @@ GUI = {};
 					}));
 
 					time = new Date(result.cube.max_date);
-					$("#testMessage").html("ES Last Updated " + time.addTimezone().format("NNN dd @ HH:mm") + Date.getTimezone());
+					var tm = $("#testMessage");
+					tm.html(new Template("<div style={{style|css}}>{{name}}</div>").expand(result.index));
+					tm.append("<br>ES Last Updated " + time.addTimezone().format("NNN dd @ HH:mm") + Date.getTimezone());
 				} else if (indexName == "reviews") {
 					time = yield (REVIEWS.getLastUpdated());
 					$("#testMessage").html("Reviews Last Updated " + time.addTimezone().format("NNN dd @ HH:mm") + Date.getTimezone());
@@ -602,7 +604,6 @@ GUI = {};
 				}//for
 
 				GUI.UpdateSummary();
-
 
 				if (refresh===undefined || refresh==true) GUI.refreshChart();
 			});

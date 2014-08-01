@@ -25,11 +25,15 @@ var Q;   //=Q
 
 
 function splitField(fieldname){
-	return fieldname.replaceAll("\\.", "\b").split(".").map(function(v){return v.replaceAll("\b", ".");});
+	try{
+		return fieldname.replaceAll("\\.", "\b").split(".").map(function(v){return v.replaceAll("\b", ".");});
+	}catch(e){
+		Log.error("Can not split field", e);
+	}//try
 }//method
 
 function joinField(path){
-	return path.map(function(v){return v.replaceAll(".", "\\.");}.join("."));
+	return path.map(function(v){return v.replaceAll(".", "\\.");}).join(".");
 }//method
 
 
@@ -151,7 +155,7 @@ function* calc2Tree(query){
 	var edges = query.edges;
 	query.columns = Qb.compile(query, sourceColumns);
 	var select = Array.newInstance(query.select);
-	var where = Qb.where.compile(nvl(query.where, query.esfilter), sourceColumns, edges);
+	var _where = Qb.where.compile(nvl(query.where, query.esfilter), sourceColumns, edges);
 	var numWhereFalse=0;
 
 
@@ -216,7 +220,7 @@ function* calc2Tree(query){
 		}//for
 
 		for(var r = results.length; r--;){
-			var pass = where(row, results[r]);
+			var pass = _where(row, results[r]);
 			if (pass){
 				calcAgg(row, results[r], query, select);
 			}else{
@@ -723,17 +727,25 @@ Qb.normalize=function(query, edgeIndex, multiple){
 };
 
 
-Qb.removeZeroParts=function(query, edgeIndex){
+//selectValue - THE FIELD TO USE TO CHECK FOR ZEROS (REQUIRED IF RECORDS ARE OBJECTS INSTEAD OF VALUES)
+Qb.removeZeroParts=function(query, edgeIndex, selectValue){
 	if (query.cube===undefined) Log.error("Can only normalize a cube into a table at this time");
+	if (selectValue===undefined) Log.error("method now requires third parameter");
 
 	var domain = query.edges[edgeIndex].domain;
 	var zeros=domain.partitions.map(function(){ return true;});
 
 	//CHECK FOR ZEROS
 	var m = new Matrix({"data": query.cube});
-	m.forall(edgeIndex, function (v, i) {
-		if (v.count !== undefined && v.count != null && v.count != 0) zeros[i] = false;
-	});
+		if (query.select instanceof Array){
+			m.forall(edgeIndex, function (v, i) {
+				if (v[selectValue] !== undefined && v[selectValue] != null && v[selectValue] != 0) zeros[i] = false;
+			});
+		}else{
+			m.forall(edgeIndex, function (v, i) {
+				if (v !== undefined && v != null && v != 0) zeros[i] = false;
+			});
+		}//endif
 
 	//REMOVE ZERO PARTS FROM EDGE
 	var j = 0;
@@ -997,8 +1009,12 @@ Qb.merge=function(query){
 Qb.sort = function(data, sortOrder, columns){
 	if (sortOrder.length==0) return data;
 	var totalSort = Qb.sort.compile(sortOrder, columns, true);
-	data.sort(totalSort);
-	return data;
+	try{
+		data.sort(totalSort);
+		return data;
+	}catch(e){
+		Log.error("bad sort function", e)
+	}//try
 };//method
 
 
@@ -1006,7 +1022,11 @@ Qb.sort.compile=function(sortOrder, columns, useNames){
 	var orderedColumns;
 	if (columns===undefined){
 		orderedColumns = sortOrder.map(function(v){
-			return {"name":v, "sortOrder":1, "domain":Qb.domain.value}
+			if (v.value!==undefined && v.sort!==undefined){
+				return {"name": v.value, "sortOrder":nvl(v.sort, 1), "domain":Qb.domain.value};
+			}else{
+				return {"name":v, "sortOrder":1, "domain":Qb.domain.value};
+			}//endif
 		});
 	}else{
 		orderedColumns = sortOrder.map(function(v){
@@ -1024,7 +1044,12 @@ Qb.sort.compile=function(sortOrder, columns, useNames){
 			Log.warning("what?");
 		}//endif
 
-		var index=useNames ? splitField(col.name).map(function(v){return CNV.String2Quote(v);}).join("][") : col.columnIndex;
+		if (MVEL.isKeyword(col.name)){
+			var index=useNames ? splitField(col.name).map(function(v){return CNV.String2Quote(v);}).join("][") : col.columnIndex;
+		}else{
+			Log.error("Can not handle");
+		}//endif
+
 		f+="diff = orderedColumns["+o+"].domain.compare(a["+index+"], b["+index+"]);\n";
 		if (o==orderedColumns.length-1){
 			if (col.sortOrder===undefined || col.sortOrder==1){
@@ -1040,11 +1065,15 @@ Qb.sort.compile=function(sortOrder, columns, useNames){
 			}//endif
 		}//endif
 	}//for
-	f+="\n}";
+	f+="\n}\ntotalSort;";
 
-	var totalSort;
-	eval(f);
-	return totalSort;
+	var totalSort=null;
+	try{
+		totalSort = eval(f);
+		return totalSort;
+	}catch(e){
+		Log.error("eval gone wrong", e)
+	}//try
 };//method
 
 
@@ -1069,7 +1098,7 @@ Qb.drill=function(query, parts){
 	Map.copy(query, newQuery);
 	newQuery.cube=undefined;
 	newQuery.list=undefined;
-	newQuery.url=undefined;			//REMOVE, MAY CAUSE PROBLEMS
+	newQuery.index=undefined;			//REMOVE, MAY CAUSE PROBLEMS
 	if (query.esfilter){
 		if (query.esfilter.and){
 			newQuery.esfilter={"and":query.esfilter.and.copy()};

@@ -144,6 +144,9 @@ var forAllKey=function(map, func){
 	}//for
 };
 
+Map.forall = forAllKey;
+Map.items = forAllKey;
+
 var countAllKey=function(map){
 	var count=0;
 	var keys=Object.keys(map);
@@ -199,9 +202,10 @@ var reverseMap=function(map, codomain){
 
 //RETURN FIRST NOT NULL, AND DEFINED VALUE
 function nvl(){
+	var args = arguments.length == 1 ? arguments[0] : arguments;
 	var a;
-	for(var i=0;i<arguments.length;i++){
-		a=arguments[i];
+	for(var i=0;i<args.length;i++){
+		a=args[i];
 		if (a!==undefined && a!=null) return a;
 	}//for
 	return null;

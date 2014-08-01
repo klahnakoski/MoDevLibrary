@@ -66,7 +66,8 @@ Qb.analytic.add=function(query, analytic){
 		allGroups.push([]);
 		for(i = from.length; i --;){
 			var row = from[i];
-			if (copyEdge) row[query.edges[0].name]=query.edges[0].domain.end(parts[i]);
+			if (copyEdge) row[query.edges[0].name]=parts[i];
+//			if (copyEdge) row[query.edges[0].name]=query.edges[0].domain.end(parts[i]);  CONFLICTS WITH Qb.sort.compile(), WHICH EXPECTS A PARTITION OBJECT
 			if (!where(null, -1, row)){
 				nullGroup.push(row);
 				continue;
@@ -77,7 +78,8 @@ Qb.analytic.add=function(query, analytic){
 		var tree = {};  analytic.tree=tree;
 		for(i = from.length; i --;){
 			var row = from[i];
-			if (copyEdge) row[query.edges[0].name]=query.edges[0].domain.end(parts[i]);
+			if (copyEdge) row[query.edges[0].name]=parts[i];
+//			if (copyEdge) row[query.edges[0].name]=query.edges[0].domain.end(parts[i]);  CONFLICTS WITH Qb.sort.compile(), WHICH EXPECTS A PARTITION OBJECT
 			if (!where(null, -1, row)){
 				nullGroup.push(row);
 				continue;
@@ -166,7 +168,7 @@ Qb.analytic.compile = function(sourceColumns, expression){
 	f +=
 		"var output;\n" +
 			"try{ " +
-			" output=" + expression + "; " +
+			" output = (" + expression + "); " +
 			" if (output===undefined) Log.error(\"analytic returns undefined\");\n" +
 			" return output;\n" +
 			"}catch(e){\n" +

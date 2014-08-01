@@ -85,7 +85,7 @@ Qb.column.compile = function(resultColumn, sourceColumns, edges, useMVEL){  //us
 	f +=
 		"var output;\n"+
 		"try{ " +
-			"	output=" + resultColumn.value + "; " +
+			"	output=(" + resultColumn.value + ");\n" +
 			"	if (output===undefined || (output!=null && aMath.isNaN(output))) Log.error(\"" + resultColumn.name + " returns \"+CNV.Value2Quote(output));\n"+
 			"	return output;\n" +
 			"}catch(e){\n" +
@@ -133,8 +133,11 @@ Qb.where.compile = function(whereClause, sourceColumns, edges){
 		var columnName = edges[i].name;
 		var domainName = edges[i].domain.name;
 		//ONLY DEFINE VARS THAT ARE USED
-		if (whereClause.indexOf(domainName + ".") != -1){
+		if (whereClause.indexOf(domainName) != -1){
 			f += "var " + domainName + "=__result["+i+"];\n";
+		}//endif
+		if (whereClause.indexOf(columnName) != -1){
+			f += "var " + columnName + "=__result["+i+"];\n";
 		}//endif
 	}//for
 

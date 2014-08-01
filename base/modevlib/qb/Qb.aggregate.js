@@ -23,8 +23,12 @@ Qb.aggregate.compile = function(select){
 	//SOME AGGREGATES DEFER calc() UNTIL LATER
 	if (select.aggFunction===undefined){
 		select.aggFunction=function(row, result, agg){
-			var v=this.calc(row, result);
-			return this.add(agg, v);
+			try{
+				var v=this.calc(row, result);
+				return this.add(agg, v);
+			}catch(e){
+				Log.error("can not calc", e);
+			}//try
 		};//method
 	}//endif
 
@@ -564,3 +568,38 @@ Qb.aggregate.array = function(select){
 		}
 	};
 };
+
+Qb.aggregate.union = function(select){
+	select.defaultValue = function(){
+		return {map:{}};
+	};//method
+
+	select.add = function(total, v){
+		if (v === undefined || v == null) return total;
+		total.map[v]=v;
+		return total;
+	};//method
+
+	select.domain = {
+		//HOPEFULLY WE WILL NEVER NEED TO SORT ARRAY OBJECTS
+		compare:function(a, b){
+			Log.error("Please, NO!");
+		},
+
+		NULL:null,
+
+		getCanonicalPart:function(value){
+			return value;
+		},
+
+		getKey:function(partition){
+			return partition;
+		},
+
+		end :function(total){
+			return Map.getValues(total.map);
+		}
+	};
+};
+
+

@@ -51,11 +51,19 @@ Log.debug=function(){
 	});
 };//method
 
-Log.error = function(description, cause){
-	var e=new Exception(description, cause);
-//	Log.alert(description);
-	console.error(e.toString());
-	throw e;
+Log.error = function(description, cause, stackOffset){
+	var ex=new Exception(description, cause, nvl(stackOffset, 0)+1);
+
+	try{
+		var a = generate.error;
+	}catch(e){
+		var stack = e.stack;
+		ex.stack = stack.split("\n").rightBut(nvl(stackOffset, 0)+1)
+	}//try
+
+
+	console.error(ex.toString());
+	throw ex;
 };//method
 
 Log.warning = function(description, cause){
@@ -63,31 +71,86 @@ Log.warning = function(description, cause){
 	console.warn(e.toString());
 };//method
 
-Log.alert=function(message, ok_callback, cancel_callback){
+
+Log.gray=function(message, ok_callback, cancel_callback){
+	//GRAY OUT THE BODY, AND SHOW ERRO IN WHITE AT BOTTOM
 	Log.note(message);
 
-	var d=$('<div>'+message+"</div>").dialog({
-		title:"Alert",
-		draggable: false,
-		modal: true,
-		resizable: false,
+	if (!window.log_alert){
+		window.log_alert = true;
+		$('body').css({"position":"relative"}).append('<div id="log_alert" style="background-color:rgba(00, 00, 00, 0.5);position:absolute;bottom:0;height:100%;width:100%;vertical-align:bottom;zindex:10"></div>');
+	}//endif
 
-		buttons: {
-			"OK": function () {
-					$(this).dialog("close");
-					if (ok_callback) ok_callback();
-				},
-			"Cancel":cancel_callback ? function () {
-					$(this).dialog("close");
-					cancel_callback();
-				} : undefined
-		}
-	});
+	var template = new Template(
+		'<div style="width:100%;text-align:center;color:white;position:absolute;bottom:0;">{{message|html}}</div>'
+	);
 
-//	if (!ok_callback && !cancel_callback){
-//		setTimeout(function(){$(d).dialog("close");}, 10000);
-//	}//endif
+	var html = template.expand({"message":message.replaceAll("\n", " ").replaceAll("\t", " ").replaceAll("  ", " ")});
+	$('#log_alert').html(html);
 };//method
+
+Log.red=function(message){
+	//GRAY OUT THE BODY, AND SHOW ERRO IN WHITE AT BOTTOM
+	Log.note(message);
+
+	window.log_alert_till = Date.now().add("20second").getMilli();
+	if (!window.log_alert){
+		window.log_alert = true;
+		$('body').css({"position":"relative"}).append('<div id="log_alert" style="position:fixed;top:0;bottom:0;width:100%;vertical-align:bottom;pointer-events:none;"></div>');
+	}//endif
+
+	function erase() {
+		var diff = window.log_alert_till - Date.now().add("20second").getMilli();
+		if (diff>0){
+			setTimeout(erase, diff);
+		}else{
+			$('#log_alert').html("");
+		}//endif
+	}//function
+	setTimeout(erase, 20000);
+
+	var template = new Template(
+		'<div style="{{style}}">{{message|html}}</div>'
+	);
+	var html = template.expand({
+		"style":CNV.Object2CSS({
+			"width":"100%",
+			"text-align":"center",
+			"color":"white",
+			"position":"absolute",
+			"bottom":0,
+			"height":"23px",
+			"zindex":10,
+			"background-color":Color.RED.darker().toHTML()
+		}),
+		"message":message.replaceAll("\n", " ").replaceAll("\t", " ").replaceAll("  ", " ")
+	});
+	$('#log_alert').html(html);
+};//method
+
+Log.alert=function(message, ok_callback, cancel_callback){
+	Log.red(message);
+	Log.note(message);
+//
+//	var d=$('<div>'+message+"</div>").dialog({
+//		title:"Alert",
+//		draggable: false,
+//		modal: true,
+//		resizable: false,
+//
+//		buttons: {
+//			"OK": function () {
+//					$(this).dialog("close");
+//					if (ok_callback) ok_callback();
+//				},
+//			"Cancel":cancel_callback ? function () {
+//					$(this).dialog("close");
+//					cancel_callback();
+//				} : undefined
+//		}
+//	});
+};//method
+
 
 
 //TRACK ALL THE ACTIONS IN PROGRESS
