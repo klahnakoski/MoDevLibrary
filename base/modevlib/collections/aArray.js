@@ -41,6 +41,7 @@ importScript("../util/aUtil.js");
 
 	Array.prototype.copy = function(){
 		//http://jsperf.com/new-array-vs-splice-vs-slice/19
+		var b=[];
 		var i = this.length;
 		while(i--) { b[i] = this[i]; }
 		return b;
@@ -259,6 +260,17 @@ importScript("../util/aUtil.js");
 		}//for
 		return Map.getValues(output);
 	};
+
+
+	function AND(values){
+		for(var i=values.length;i--;){
+			var v=values[i];
+			if (v==false) return false;
+		}//for
+		return true;
+	}
+	Array.AND=AND;
+
 
 	Array.extend=function extend(){
 		var arrays = (arguments.length==1  && arguments[0] instanceof Array) ? arguments[0] : arguments;
