@@ -65,15 +65,21 @@ ESQuery.DEBUG = false;
 		"bugs.attachments": {},
 		"bugs.attachments.flags": {},
 
-		"reviews": {"style":{"color":"black","background-color":yellow}, "host": "http://elasticsearch-private.bugs.scl3.mozilla.com:9200", "path": "/reviews/review"},
+
+
+//        "reviews": {"style":{"color":"black","background-color":green}, "host": "http://klahnakoski-es.corp.tor1.mozilla.com:9200", "path": "/reviews/patch_review"},
+		"public_reviews": {"style":{"color":"white","background-color":green}, "host": "https://esfrontline.bugzilla.mozilla.org:443", "path": "/reviews/patch_review"},
+		"reviews": {"style":{"color":"black","background-color":yellow}, "host": "http://elasticsearch-private.bugs.scl3.mozilla.com:9200", "path": "/reviews/patch_review"},
 		"bug_summary": {"style":{"color":"black","background-color":yellow}, "host": "http://elasticsearch-private.bugs.scl3.mozilla.com:9200", "path": "/bug_summary/bug_summary"},
 		"bug_tags": {"style":{"color":"black","background-color":yellow}, "host": "http://elasticsearch-private.bugs.scl3.mozilla.com:9200", "path": "/bug_tags/bug_tags"},
-		"org_chart": {"style":{"color":"black","background-color":yellow}, "host": "http://elasticsearch-private.bugs.scl3.mozilla.com:9200", "path": "/org_chart/person"},
+		"org_chart": {"style":{"color":"black","background-color":yellow}, "host": "http://elasticsearch-private.bugs.scl3.mozilla.com:9200", "alias":"org_chart", "path": "/org_chart/person"},
 		"temp": {"style":{"color":"black","background-color":yellow}, "host": "http://elasticsearch-private.bugs.scl3.mozilla.com:9200", "path": ""},
 		"telemetry": {"style":{"color":"black","background-color":yellow}, "host": "http://elasticsearch-private.bugs.scl3.mozilla.com:9200", "path": "/telemetry_agg_valid_201305/data"},
 		"raw_telemetry": {"style":{"color":"black","background-color":yellow}, "host": "http://klahnakoski-es.corp.tor1.mozilla.com:9200", "path": "/raw_telemetry/data"},
 
 		"talos": {"style":{"color":"black","background-color":yellow}, "host": "http://klahnakoski-es.corp.tor1.mozilla.com:9200", "path": "/talos/test_results"},
+		"talos2": {"style":{"color":"black","background-color":yellow}, "host": "http://localhost:9200", "path": "/talos2/test_results"},
+		"public_talos": {"style":{"color":"black","background-color":yellow}, "host": "http://67.55.30.33:9201", "path": "/talos/test_results"},
 		"b2g_tests": {"style":{"color":"black","background-color":yellow}, "host": "http://elasticsearch-private.bugs.scl3.mozilla.com:9200", "path": "/b2g_tests/results"},
 		"b2g": {"style":{"color":"black","background-color":yellow}, "host": "http://elasticsearch-private.bugs.scl3.mozilla.com:9200", "path": "/b2g_tests/results"},
 
@@ -93,6 +99,9 @@ ESQuery.DEBUG = false;
 	ESQuery.INDEXES.bugs.alternate = ESQuery.INDEXES.public_bugs;
 	ESQuery.INDEXES.bug_hierarchy.alternate = ESQuery.INDEXES.public_bug_hierarchy;
 	ESQuery.INDEXES.bug_dependencies.alternate = ESQuery.INDEXES.public_bug_dependencies;
+	ESQuery.INDEXES.talos.alternate=ESQuery.INDEXES.public_talos;
+	ESQuery.INDEXES.reviews.alternate = ESQuery.INDEXES.public_reviews;
+
 
 })();
 
@@ -133,7 +142,7 @@ ESQuery.DEBUG = false;
 	//RETURN THE COLUMN DEFINITIONS IN THE GIVEN esProperties OBJECT
 	ESQuery.parseColumns = function (indexName, parentName, esProperties) {
 		var columns = [];
-		forAllKey(esProperties, function (name, property) {
+		Map.forall(esProperties, function (name, property) {
 			var fullName = [parentName, name].concatenate(".");
 
 			if (property.type == "nested") {
@@ -154,7 +163,7 @@ ESQuery.DEBUG = false;
 			if (property.type === undefined) return;
 			if (property.type == "multi_field") {
 				property.type = property.fields[name].type;  //PULL DEFAULT TYPE
-				forAllKey(property.fields, function (n, p, i) {
+				Map.forall(property.fields, function (n, p, i) {
 					if (n == name) {
 						//DEFAULT
 						columns.push({"name": fullName, "type": p.type, "useSource": p.index == "no"});
@@ -328,7 +337,10 @@ ESQuery.DEBUG = false;
 
 
 	ESQuery.prototype.run = function*() {
-		if (!this.query.index) {
+		if (this.query.url) {
+			this.query.index = {};
+			this.query.index.url = this.query.url;
+		}else if (!this.query.index) {
 			this.query.index = ESQuery.INDEXES[splitField(this.query.from)[0]];
 			if (this.query.index === undefined) Log.error("must have host defined");
 			this.query.index.url = this.query.index.host + this.query.index.path;
@@ -374,7 +386,7 @@ ESQuery.DEBUG = false;
 			}//try
 
 			var self = this;
-			if (postResult.facets) forAllKey(postResult.facets, function (facetName, f) {
+			if (postResult.facets) Map.forall(postResult.facets, function (facetName, f) {
 				if (f._type == "statistical") return;
 				if (!f.terms) return;
 
@@ -662,6 +674,10 @@ ESQuery.DEBUG = false;
 
 		var output = [];
 		var partitions = edge.domain.partitions;
+		if (partitions.length==0){
+			Log.error("There are no partitions in edge "+edge.name+", which is destined for a facet, which wil result in nothing")
+		}//endif
+
 		for (var i = 0; i < partitions.length; i++) {
 			var deeper = this.getAllEdges(edgeDepth + 1);
 			for (var o = 0; o < deeper.length; o++) {
@@ -1349,7 +1365,7 @@ ESQuery.DEBUG = false;
 
 		//FILL Qb
 		if (self.query.select instanceof Array) {
-			forAllKey(data.facets, function (edgeName, facetValue) {
+			Map.forall(data.facets, function (edgeName, facetValue) {
 				var coord = edgeName.split(",");
 				var d = cube;
 				var num = self.query.edges.length;
@@ -1366,7 +1382,7 @@ ESQuery.DEBUG = false;
 				}//for
 			});
 		} else {
-			forAllKey(data.facets, function (edgeName, facetValue) {
+			Map.forall(data.facets, function (edgeName, facetValue) {
 				var coord = edgeName.split(",");
 				var d = cube;
 				var num = self.query.edges.length - 1;
@@ -1507,7 +1523,7 @@ ESQuery.DEBUG = false;
 
 		if (this.query.select instanceof Array || this.select.length > 1) {
 			for (var i = T.length; i--;) {
-				var record = T[i].fields
+				var record = nvl(T[i].fields, {});
 				var new_rec = {};
 				this.select.forall(function (s, j) {
 					if (s.domain && s.domain.interval=="none"){
