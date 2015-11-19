@@ -69,7 +69,7 @@ Date.max=function(){
 
 
 Date.prototype.getMilli = Date.prototype.getTime;
-
+Date.prototype.milli = Date.prototype.getTime;
 
 Date.prototype.between=function(min, max){
 	if (min==null) return null;	//NULL MEANS UNKNOWN, SO between() IS UNKNOWN
@@ -160,7 +160,7 @@ Date.diffWeekday=function(endTime, startTime){
 	var output=((startWeek.getMilli()-startTime.getMilli())+((endWeek.getMilli()-startWeek.getMilli())/7)*5+(endTime.getMilli()-endWeek.addDay(2).getMilli()))/Duration.DAY.milli;
 
 
-	if (out!=aMath.ceil(output))
+	if (out!=aMath.sign(output)*aMath.ceil(aMath.abs(output)))
 		Log.error("Weekday calculation failed internal test");
 
 
@@ -858,7 +858,7 @@ Date.tryParse=function(val, isFutureDate){
 
 	var d = null;
 	for(var i = 0; i < Date.CheckList.length; i++){
-		d = Date.getDateFromFormat(val, Date.CheckList[i], !nvl(isFutureDate, false));
+		d = Date.getDateFromFormat(val, Date.CheckList[i], !coalesce(isFutureDate, false));
 		if (d != 0){
 			var temp=Date.CheckList[i];
 			Date.CheckList.splice(i, 1);

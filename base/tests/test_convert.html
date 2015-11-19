@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+	<meta charset="UTF-8">
+	<title></title>
+</head>
+<body>
+</body>
+
+<script>
+	importScript([
+		"../../modevlib/util/convert.js",
+		"../../modevlib/util/aTest.js"
+	], function(){
+		var test = convert.Value2Quote("[\"test\"]");
+		assert.equal(test, "\"[\\\"test\\\"]\"", "quoting is not what's expected")
+	});
+</script>
+
+</html>

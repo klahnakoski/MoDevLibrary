@@ -1,4 +1,4 @@
-importScript("../util/CNV.js");
+importScript("../util/convert.js");
 
 
 Color = function (L, h, s) {
@@ -13,7 +13,7 @@ Color = function (L, h, s) {
 	//
 	// EVERY COLOUR LIBRARY I HAVE TRIED BARELY DOES ONE OF THESE, NEVER MIND
 	// TWO OF THEM:
-	// * LINEAR AMPLIFICATION OF LIGHTNESS
+	// * LINEAR AMPLIFICATION OF LIGHTNESS (linear defined by cie)
 	// * NATURAL ROTATION IN HUE
 	// * VARY SATURATION WITHOUT CONTORTING THE HUE
 	// * REASONABLE APPROXIMATIONS FOR COLOUR OUTSIDE THE sRGB GAMUT!!!
@@ -45,9 +45,9 @@ Color = function (L, h, s) {
 	var COLOR_MESH = hex_color.map(function (L) {
 		return L.map(function (h) {
 			return {
-				"r": CNV.hex2int(h.substring(0, 2)),
-				"g": CNV.hex2int(h.substring(2, 4)),
-				"b": CNV.hex2int(h.substring(4, 6))
+				"r": convert.hex2int(h.substring(0, 2)),
+				"g": convert.hex2int(h.substring(2, 4)),
+				"b": convert.hex2int(h.substring(4, 6))
 			};
 		});
 	}).reverse();
@@ -58,25 +58,39 @@ Color = function (L, h, s) {
 	Color.BLUE = new Color(1.0, 0.0, 1.0);
 
 
-	var ColorSRGB = function (r, g, b) {
-		this.r = r;
-		this.g = g;
-		this.b = b;
+	ColorSRGB = function (r, g, b) {
+
+		if (r instanceof Array && g===undefined && b===undefined){
+			this.rgb=r
+		}else{
+			this.rgb=[r, g, b];
+		}
 	};//function
 
 	ColorSRGB.prototype.lighter=function(){
-		return new ColorSRGB(this.r*1.2, this.g*1.2, this.b*1.2);
+		return new ColorSRGB(this.rgb.map(function(v){
+			return Math.min(Math.round(v+30), 255);
+		}));
 	};
 
-	ColorSRGB.prototype.toHTML=function(){
-		return hex(this);
-	};
+	function toHTML(){
+		return hex({"r":this.rgb[0], "g":this.rgb[1], "b":this.rgb[2]});
+	}
+	ColorSRGB.prototype.toHTML=toHTML;
+	ColorSRGB.prototype.toString=toHTML;
 
 	Color.newInstance=function(value){
 		if (value.startsWith("lhs(")){
 			value=value.between("lhs(", ")");
 			var lhs = value.split(",").map(function(v){return v.trim()-0;});
 			return new Color(lhs[0], lhs[1], lhs[2]);
+		}else if (value.startsWith("#")){
+			var rgb = Array.newRange(0, 3).map(function(i){
+				return convert.hex2int(value.substring(i*2+1, i*2+3))
+			});
+			return new ColorSRGB(rgb);
+		}else{
+			return value;  //MAYBE WE ARE LUCKY
 		}//endif
 	};
 
@@ -93,9 +107,9 @@ Color = function (L, h, s) {
 
 		//EXPECTING "#" AS FIRST VALUE
 		return new ColorSRGB(
-			CNV.hex2int(value.substring(1, 3)),
-			CNV.hex2int(value.substring(3, 5)),
-			CNV.hex2int(value.substring(5, 7))
+			convert.hex2int(value.substring(1, 3)),
+			convert.hex2int(value.substring(3, 5)),
+			convert.hex2int(value.substring(5, 7))
 		);
 	}//function
 
@@ -150,7 +164,7 @@ Color = function (L, h, s) {
 		if (value===undefined){
 			Log.error();
 		}//endif
-		return "#" + CNV.int2hex(Math.round(value.r), 2) + CNV.int2hex(Math.round(value.g), 2) + CNV.int2hex(Math.round(value.b), 2);
+		return "#" + convert.int2hex(Math.round(value.r), 2) + convert.int2hex(Math.round(value.g), 2) + convert.int2hex(Math.round(value.b), 2);
 	}//function
 
 })();

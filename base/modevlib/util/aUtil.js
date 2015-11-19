@@ -99,11 +99,16 @@ Map.expecting=function(obj, keyList){
 Map.get=function(obj, fieldName){
 	if (obj===undefined || obj==null) return obj;
 	var path = splitField(fieldName);
-	for (var i=0;i<path.length;i++){
-		obj = obj[path[i]];
-		if (obj===undefined || obj==null) return obj;
+	for (var i=0;i<path.length-1;i++){
+		var step = path[i];
+		if (step=="length"){
+			obj = eval("obj.length");
+		}else{
+			obj = obj[step];
+		}//endif
+		if (obj===undefined || obj==null) return undefined;
 	}//endif
-	return obj;
+	return obj[path.last()];
 };//method
 
 
@@ -149,6 +154,7 @@ Map.equals=function(a, b){
 
 
 var forAllKey=function(map, func){
+	//func MUST ACCEPT key, value PARAMETERS
 	var keys=Object.keys(map);
 	for(var i=keys.length;i--;){
 		var key=keys[i];
@@ -172,13 +178,14 @@ var countAllKey=function(map){
 };
 
 var mapAllKey=function(map, func){
+	//func MUST ACCEPT key, value, index PARAMETERS
 	var output=[];
 	var keys=Object.keys(map);
 	for(var i=keys.length;i--;){
 		var key=keys[i];
 		var val=map[key];
 		if (val!==undefined){
-			var result=func(key, val);
+			var result=func(key, val, i);
 			if (result!==undefined) output.push(result);
 		}//endif
 	}//for
@@ -233,8 +240,16 @@ var reverseMap=function(map, codomain){
 
 
 //RETURN FIRST NOT NULL, AND DEFINED VALUE
-function nvl(){
-	var args = arguments.length == 1 ? arguments[0] : arguments;
+function coalesce(){
+	var args=arguments;
+	if (args instanceof Array && args.length == 1) {
+		if (arguments[0] == undefined) {
+			return null;
+		}else{
+			args=arguments[0]; //ASSUME IT IS AN ARRAY
+		}//endif
+	}//endif
+
 	var a;
 	for(var i=0;i<args.length;i++){
 		a=args[i];
@@ -243,12 +258,8 @@ function nvl(){
 	return null;
 }//method
 
-var coalesce=nvl;
-
 
 var Util = {};
-
-Util.coalesce = nvl;
 
 Util.returnNull = function(__row){
 	return null;

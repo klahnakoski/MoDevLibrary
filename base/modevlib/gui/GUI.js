@@ -78,16 +78,18 @@ GUI = {};
 			relations,     //SOME RULES TO APPLY TO PARAMETERS, IN CASE THE HUMAN MAKES SMALL MISTAKES
 			indexName,     //PERFORM CHECKS ON THIS INDEX
 			showDefaultFilters,  //SHOW THE Product/Compoentn/Team FILTERS
-			performChecks           //PERFORM SOME CONSISTENCY CHECKS TOO
+			performChecks,       //PERFORM SOME CONSISTENCY CHECKS TOO
+			checkLastUpdated     //SEND QUERY TO GET THE LAST DATA?
 		) {
 
-			GUI.performChecks=nvl(performChecks, true);
+			GUI.performChecks=coalesce(performChecks, true);
+			GUI.checkLastUpdated=coalesce(checkLastUpdated, true);
 
 			if (typeof(refreshChart) != "function") {
 				Log.error("Expecting first parameter to be a refresh (creatChart) function");
 			}//endif
 			GUI.refreshChart = refreshChart;
-			GUI.pleaseRefreshLater = nvl(GUI.pleaseRefreshLater, false);
+			GUI.pleaseRefreshLater = coalesce(GUI.pleaseRefreshLater, false);
 
 			//IF THERE ARE ANY CUSTOM FILTERS, THEN TURN OFF THE DEFAULTS
 			var isCustom = false;
@@ -117,7 +119,7 @@ GUI = {};
 
 			GUI.makeSelectionPanel();
 
-			GUI.relations = nvl(relations, []);
+			GUI.relations = coalesce(relations, []);
 			GUI.FixState();
 
 			GUI.URL2State();				//OVERWRITE WITH URL PARAM
@@ -137,6 +139,8 @@ GUI = {};
 
 		//SHOW THE LAST TIME ES WAS UPDATED
 		GUI.showLastUpdated = function(indexName) {
+			if (!GUI.checkLastUpdated) return;
+
 			Thread.run("show last updated timestamp", function*() {
 				var time;
 
@@ -149,7 +153,7 @@ GUI = {};
 
 					time = new Date(result.cube.max_date);
 					var tm = $("#testMessage");
-					tm.html(new Template("<div style={{style|css}}>{{name}}</div>").expand(result.index));
+					tm.html(new Template("<div style={{style|style}}>{{name}}</div>").expand(result.index));
 					tm.append("<br>ES Last Updated " + time.addTimezone().format("NNN dd @ HH:mm") + Date.getTimezone());
 				} else if (indexName == "reviews") {
                     var result = yield (ESQuery.run({
@@ -260,9 +264,13 @@ GUI = {};
 				if (v.isFilter) {
 					simplestate[k] = v.getSimpleState();
 				} else if (jQuery.isArray(v)) {
-					if (v.length > 0) simplestate[k] = v.join(",");
+					if (v.length > 0) {
+						simplestate[k] = v.join(",");
+					}else{
+						simplestate[k] = undefined;
+					}//endif
 				} else if (p && p.type == "json") {
-					v = CNV.Object2JSON(v);
+					v = convert.value2json(v);
 					v = v.escape(GUI.urlMap);
 					simplestate[k] = v;
 				} else if (typeof(v) == "string" || aMath.isNumeric(k)) {
@@ -304,13 +312,20 @@ GUI = {};
 				} else if (p && p.type == "json") {
 					try {
 						v = v.escape(Map.inverse(GUI.urlMap));
-						GUI.state[k] = CNV.JSON2Object(v);
+						GUI.state[k] = convert.json2value(v);
 					} catch (e) {
 						Log.error("Malformed JSON: " + v);
 					}//try
 				} else if (p && p.type == "text") {
 					v = v.escape(Map.inverse(GUI.urlMap));
 					GUI.state[k] = v;
+				} else if (p && p.type == "set") {
+					v = v.escape(Map.inverse(GUI.urlMap));
+					if (v.trim()==""){
+						GUI.state[k]=[];
+					}else{
+						GUI.state[k] = v.split(",").map(String.trim);
+					}//endif
 				} else if (p && p.type == "code") {
 					v = v.escape(Map.inverse(GUI.urlMap));
 					GUI.state[k] = v;
@@ -328,7 +343,8 @@ GUI = {};
 		// ADD INTERACTIVE PARAMETERS TO THE PAGE
 		// id - id of the html form element (can exist, or not), also used as GUI.state variable
 		// name - humane name of the parameter
-		// type - some basic data types to drive the type of form element used (time, date, datetime, duration, text, boolean, json, code)
+		// type - some basic data types to drive the type of form element used
+		// (time, date, datetime, duration, text, set, boolean, json, code)
 		// default - default value if not specified in URL
 		///////////////////////////////////////////////////////////////////////////
 		GUI.AddParameters = function (parameters, relations) {
@@ -362,7 +378,8 @@ GUI = {};
 						"text": "text",
 						"boolean": "checkbox",
 						"json": "textarea",
-						"code": "textarea"
+						"code": "textarea",
+						"set": "text"
 					}[param.type]  //MAP PARAMETER TYPES TO HTML TYPES
 				});
 			});
@@ -463,12 +480,19 @@ GUI = {};
 				} else if (param.type == "code") {
 					var codeDiv = $("#" + param.id);
 					codeDiv.linedtextarea();
-					codeDiv.change(function () {
+					codeDiv.change(function(){
 						if (GUI.UpdateState()) {
 							GUI.refreshChart();
 						}
 					});
 					codeDiv.val(defaultValue);
+				}else if (param.type == "set"){
+					$("#" + param.id).change(function () {
+						if (GUI.UpdateState()) {
+							GUI.refreshChart();
+						}
+					});
+					$("#" + param.id).val(defaultValue.join(","));
 				} else {
 					if (param.type == "string") param.type = "text";
 					$("#" + param.id).change(function () {
@@ -490,11 +514,13 @@ GUI = {};
 			GUI.parameters.forEach(function (param) {
 
 				if (param.type == "json") {
-					$("#" + param.id).val(CNV.Object2JSON(GUI.state[param.id]));
+					$("#" + param.id).val(convert.value2json(GUI.state[param.id]));
 				} else if (param.type == "boolean") {
 					$("#" + param.id).prop("checked", GUI.state[param.id]);
 				} else if (param.type == "datetime") {
 					$("#" + param.id).val(Date.newInstance(GUI.state[param.id]).format("yyyy-MM-dd HH:mm:ss"))
+				} else if (param.type == "set") {
+					$("#" + param.id).val(GUI.state[param.id].join(","))
 				} else {
 				//if (param.type.getSimpleState) return;  //param.type===GUI.state[param.id] NO ACTION REQUIRED
 					$("#" + param.id).val(GUI.state[param.id]);
@@ -507,9 +533,16 @@ GUI = {};
 		GUI.Parameter2State = function () {
 			GUI.parameters.forEach(function (param) {
 				if (param.type == "json") {
-					GUI.state[param.id] = CNV.JSON2Object($("#" + param.id).val());
+					GUI.state[param.id] = convert.json2value($("#" + param.id).val());
 				} else if (param.type == "boolean") {
 					GUI.state[param.id] = $("#" + param.id).prop("checked");
+				}else if (param.type =="set"){
+					var v=$("#" + param.id).val();
+					if (v.trim() == "") {
+						GUI.state[param.id]=[];
+					}else{
+						GUI.state[param.id]=v.split(",").map(String.trim);
+					}//endif
 				} else {
 					GUI.state[param.id] = $("#" + param.id).val();
 				}//endif

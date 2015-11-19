@@ -52,6 +52,7 @@ importScript("../util/aUtil.js");
 		for(var i=0;i<this.length;i++){
 			func(this[i], i, this);
 		}//for
+		return this;
 	};//method
 
 	Array.prototype.insert=function(index, value){
@@ -126,7 +127,7 @@ importScript("../util/aUtil.js");
 		if (typeof(func) == "function") {
 			//DO NOTHING
 		}else{
-			func = CNV.esFilter2function(func)
+			func = convert.esFilter2function(func)
 		}//endif
 
 		var output=[];

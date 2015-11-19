@@ -19,7 +19,7 @@ Bugzilla.showBugs=function(bugList){
 Bugzilla.searchBugsURL=function(bugList){
 	if (bugList instanceof Array){
 		return Bugzilla.URL+"?quicksearch="+bugList.join('%2C');
-	}else if (typeof(buglist)=="string"){
+	}else if (typeof(bugList)=="string"){
 		return Bugzilla.URL+"?quicksearch="+bugList.replaceAll(", ", "%2C");
 	}else{
 		return Bugzilla.URL+"?quicksearch="+bugList;
@@ -59,7 +59,7 @@ Bugzilla.search=function*(bugList, fields){
 				var b=data[r];
 				for(var c=fields.length;c--;){
 					var f=fields[c];
-					b[f]=nvl(b[f], null);
+					b[f]=coalesce(b[f], null);
 				}
 			}
 
