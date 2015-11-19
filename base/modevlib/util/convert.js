@@ -95,7 +95,7 @@ convert.json2value = function(json){
 
 
 convert.Map2Style = function(map){
-	return mapAllKey(map, function(k, v){return k+":"+v;}).join(";")+";";
+	return Map.map(map, function(k, v){return k+":"+v;}).join(";")+";";
 };//method
 
 
@@ -153,7 +153,7 @@ convert.value2json = function(json){
 		}//for
 		return output+"\n}";
 
-//		return "{\n\t"+mapAllKey(json, function(k, v){
+//		return "{\n\t"+Map.map(json, function(k, v){
 //			if (v===undefined) return "";
 //			return "\""+k+"\":"+convert.value2json(v).indent(1).trim();
 //		}).join(",\n\t")+"\n}";
@@ -181,14 +181,14 @@ convert.Object2CSS=function(value){
 	});
 
 	if (depth==2){
-		return mapAllKey(value, function(selector, css){
+		return Map.map(value, function(selector, css){
 			return selector+" {"+
-				mapAllKey(css, function(name, value){
+				Map.map(css, function(name, value){
 					return  name+":"+value;
 				}).join(";")+"}";
 		}).join("\n\n");
 	}else{
-		return mapAllKey(value, function(name, value){
+		return Map.map(value, function(name, value){
 			return  name+":"+value;
 		}).join(";")
 	}//endif
@@ -202,7 +202,7 @@ convert.style2Object=function(value){
 };//method
 
 convert.Object2style=function(style){
-	return mapAllKey(style, function(name, value){
+	return Map.map(style, function(name, value){
 		return name+":"+value;
 	}).join(";");
 };//method
@@ -288,7 +288,7 @@ convert.URLParam2Object = function(param){
 
 	convert.String2HTML = function String2HTML(value) {
 		if (value==null) return "";
-		return value.translate(entityMap);
+		return (""+value).translate(entityMap);
 	};//method
 
 	var attrMap = {
@@ -313,8 +313,20 @@ convert.String2HTMLTable = function(value){
 };//method
 
 convert.String2Quote = function(str){
-	return "\"" + (str + '').replaceAll("\n", "\\n").replace(/([\n\\"'])/g, "\\$1").replace(/\0/g, "\\0") + "\"";
+	return "\"" + (str + '').replaceAll("\n", "\\n").replace(/([\n\t\\"'])/g, "\\$1").replace(/\0/g, "\\0") + "\"";
 };//method
+
+convert.string2quote = convert.String2Quote;
+convert.value2quote = function(value){
+	if (isString(value)) {
+		return convert.String2Quote(value);
+	} else if (value === undefined || value == null) {
+		return "null";
+	} else {
+		return "" + value;
+	}//endif
+};//method
+
 
 convert.Date2Code = function(date){
 	return "Date.newInstance("+date.getMilli()+")";
@@ -363,8 +375,8 @@ convert.Value2Text=function(value){
 		}//endif
 	}//endif
 
-	var json = convert.value2json(value);
-	return convert.String2Quote(json);
+	var json = JSON.stringify(value);
+	return json;
 };//method
 
 
@@ -550,12 +562,15 @@ convert.Cube2HTMLTable=function(query){
 
 
 convert.List2HTMLTable = function(data, options){
-	if (data.list && data.columns){
+	if (data.list && data.columns) {
 		//CONVERT FROM QUERY TO EXPECTED FORM
-		options=data;
-		data=data.list;
+		options = data;
+		data = data.list;
+	} else if (data.meta && data.meta.format=="list" && data.data){
+		//CONVERT FROM ActiveData LIST
+		options = {"columns": data.header};
+		data = data.data;
 	}//endif
-
 
 	if (data.length==0){
 		return "<table class='table'><tbody><tr><td>no records to show</td></tr></tbody></table>";
@@ -574,10 +589,15 @@ convert.List2HTMLTable = function(data, options){
 	});
 	header = "<thead><tr><div>" + header + "</div></tr></thead>";
 
-
 	var output = "";
 	var numRows=data.length;
-	if (options!==undefined && options.limit!==undefined && numRows>options.limit) numRows=options.limit;
+	if (options!==undefined) {
+		if (options.limit !== undefined && numRows > options.limit){
+			numRows = options.limit;
+		}//endif
+	}//endif
+
+
 	//WRITE DATA
 	for(var i = 0; i < data.length; i++){
 		var row = "";
@@ -617,7 +637,7 @@ wrapWithHtmlTag = function(tagName, value){
 		return prefix + value + suffix;
 	} else if (typeof(value) == "string") {
 		return prefix + convert.String2HTML(value) + suffix;
-	} else if (aMath.isNumeric(value) && ("" + value).length == 10 && ("" + value).startsWith("1") && value>1200000000) {
+	} else if (aMath.isNumeric(value) && ("" + value).split(".")[0].length == 10 && ("" + value).startsWith("1") && value>1200000000) {
 		//PROBABLY A UNIX TIMESTAMP
 		value = new Date(value*1000);
 		if (value.floorDay().getMilli() == value.getMilli()) {
@@ -626,7 +646,7 @@ wrapWithHtmlTag = function(tagName, value){
 			return prefix + new Date(value).format("dd-NNN-yyyy HH:mm:ss") + suffix;
 		}//endif
 	} else if (aMath.isNumeric(value)) {
-		if (("" + value).length == 13) {
+		if (("" + value).split(".")[0].length == 13) {
 			//PROBABLY A TIMESTAMP
 			value = new Date(value);
 			if (value.floorDay().getMilli() == value.getMilli()) {
@@ -637,15 +657,15 @@ wrapWithHtmlTag = function(tagName, value){
 		} else {
 			return prefix.leftBut(1) + " style='text-align:right;'>" + value + suffix;
 		}
-	} else if (value.milli) {
-		//DURATION
-		return prefix + value.toString() + suffix;
 	} else if (value.getTime) {
 		if (value.floorDay().getMilli() == value.getMilli()) {
 			return prefix + new Date(value).format("dd-NNN-yyyy") + suffix;
 		} else {
 			return prefix + new Date(value).format("dd-NNN-yyyy HH:mm:ss") + suffix;
 		}//endif
+	} else if (value.milli) {
+		//DURATION
+		return prefix + value.toString() + suffix;
 //	} else if (value.toString !== undefined){
 //		return prefix + convert.String2HTML(value.toString()) + suffix;
 	}//endif
@@ -779,12 +799,16 @@ function String2Selector(str){
 convert.String2JQuery=String2Selector;
 convert.String2Selector=String2Selector;
 
+convert.String2Regexp= function(s) {
+    return s.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+};
 
 TRUE_FILTER = function(row, i, rows){return true;};
 FALSE_FILTER = function(row, i, rows){return false;};
 
 convert.esFilter2function=function(esFilter){
-	if (esFilter === undefined) return TRUE_FILTER;
+	if (esFilter === undefined || esFilter==null || esFilter==true) return TRUE_FILTER;
+	if (esFilter == false) return FALSE_FILTER;
 
 	var keys = Object.keys(esFilter);
 	if (keys.length != 1)
@@ -840,7 +864,9 @@ convert.esFilter2function=function(esFilter){
 	} else if (op == "terms"){
 		var terms = esFilter[op];
 		var variables = Object.keys(terms);
-		if (variables.length>1) Log.error("not allowed");
+		if (variables.length>1){
+			Log.error("not allowed");
+		}//endif
 		var variable = variables[0];
 		return function(row){
 			var value = row[variable];
@@ -861,12 +887,39 @@ convert.esFilter2function=function(esFilter){
 			var val =row[field];
 			return (val!==undefined && val!=null);
 		};
-	}else if (op=="missing"){
+	}else if (op=="missing") {
 		var field = coalesce(esFilter[op].field, esFilter[op]);
 		return function(row, i, rows){
-			var val =row[field];
-			return (val===undefined || val==null);
+			var val = row[field];
+			return (val === undefined || val == null);
 		};
+	}else if (['gt', 'gte', 'lt', 'lte'].contains(op)){
+		var pair = esFilter[op];
+		var variableName = Object.keys(pair)[0];
+		var value = pair[variableName];
+
+		return {
+			"gt":function(row, i, rows){
+				var v = Map.get(row, variableName);
+				if (v===undefined) return false;
+				return v > value;
+			},
+			"gte":function(row, i, rows){
+				var v = Map.get(row, variableName);
+				if (v===undefined) return false;
+				return v >= value;
+			},
+			"lt":function(row, i, rows){
+				var v = Map.get(row, variableName);
+				if (v===undefined) return false;
+				return v < value;
+			},
+			"lte": function(row, i, rows){
+				var v = Map.get(row, variableName);
+				if (v === undefined) return false;
+				return v <= value;
+			}
+		}[op];
 	} else if (op == "range"){
 		var pair = esFilter[op];
 		var variableName = Object.keys(pair)[0];
@@ -991,7 +1044,7 @@ convert.esFilter2Expression=function(esFilter){
 	} else if (op == "not"){
 		return "!(" + convert.esFilter2Expression(esFilter[op]) + ")";
 	} else if (op == "term"){
-		return mapAllKey(esFilter[op], function(variableName, value){
+		return Map.map(esFilter[op], function(variableName, value){
 			if (value instanceof Array){
 				Log.error("Do not use term filter with array of values ("+convert.value2json(esFilter)+")");
 			}//endif

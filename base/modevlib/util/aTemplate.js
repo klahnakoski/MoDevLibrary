@@ -1,6 +1,7 @@
 importScript("../collections/aArray.js");
 importScript("aUtil.js");
 importScript("aString.js");
+importScript("aDate.js");
 importScript("convert.js");
 
 
@@ -41,13 +42,22 @@ var Template = function Template(template){
 	FUNC.attribute = convert.value2HTMLAttribute;
 	FUNC.datetime = function(d, f){
 		f = coalesce(f, "yyyy-MM-dd HH:mm:ss");
-		return d.format(f);
+		return Date.newInstance(d).format(f);
 	};
 	FUNC.indent = function(value, amount){
 		return toString(value).indent(amount);
 	};
 	FUNC.left = function(value, amount){
 		return toString(value).left(amount);
+	};
+	FUNC.deformat = function(value){
+		return toString(value).deformat();
+	};
+	FUNC.json = function(value){
+		return convert.value2json(value);
+	};
+	FUNC.quote = function(value){
+		return convert.value2quote(value);
 	};
 
 

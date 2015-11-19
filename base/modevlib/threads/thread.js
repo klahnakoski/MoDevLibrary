@@ -114,10 +114,15 @@ build = function(){
 			name = undefined;
 		}//endif
 
+
+		Thread.currentThread.addChild(this);
+
 		//START IN SILENT MODE
 		var output = new Thread(gen);
 		output.name = name;
 		output.resume(output.stack.pop());
+		output.parentThread = Thread.currentThread;
+		Thread.currentThread.addChild(this);
 		return output;
 	};//method
 

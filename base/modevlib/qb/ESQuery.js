@@ -238,11 +238,11 @@ ESQuery.NOT_SUPPORTED = "From clause not supported \n{{from}}";
 		if (pathLength == 1) {  //EG http://host/indexname/_mapping
 			//CHOOSE AN INDEX
 			prefix = URL.split("/")[3];
-			indicies = Object.keys(schema);
-			if (indicies.length == 1) {
-				schema = schema[indicies[0]]
+			indices = Object.keys(schema);
+			if (indices.length == 1) {
+				schema = schema[indices[0]]
 			} else {
-				schema = mapAllKey(function(k, v){
+				schema = Map.map(function(k, v){
 					if (k.startsWith(prefix)) return v;
 				})[0]
 			}//endif
@@ -261,7 +261,7 @@ ESQuery.NOT_SUPPORTED = "From clause not supported \n{{from}}";
 				}//endif
 			}else if (cluster_info.version.number.startsWith("1.4")){
 				//FULL INDEX/TYPE STRUCTURE IS RETURNED
-				index = mapAllKey(schema, function(k, v){
+				index = Map.map(schema, function(k, v){
 					if (k.startsWith(path[0])) return v;
 				})[0];
 				schema = index.mappings[path[1]];
@@ -1328,7 +1328,22 @@ ESQuery.NOT_SUPPORTED = "From clause not supported \n{{from}}";
 			}//for
 		}//for
 
+		//OLD MoDevLib FORM
 		this.query.cube = cube;
+
+		//A BETTER FORM IS COLUMNAR
+		if (select instanceof Array){
+			this.query.data = Map.zip(select.map(function(s){
+				return [
+					s.name,
+					cube.map(function(d, i){
+						return d[s.name];
+					})
+				]
+			}));
+		}else{
+			this.query.data = Map.newInstance(select.name, cube);
+		}//endif
 	};
 
 	//PROCESS RESULTS FROM THE ES STATISTICAL FACETS
@@ -1574,6 +1589,11 @@ ESQuery.NOT_SUPPORTED = "From clause not supported \n{{from}}";
 			return v[select.name];
 		});
 	};//method
+
+	//SET ESQuery AS DEFAULT
+	Settings.host_types["undefined"]=ESQuery.run;
+	Settings.host_types["null"]=ESQuery.run;
+	Settings.host_types["ElasticSearch"]=ESQuery.run;
 
 })();
 

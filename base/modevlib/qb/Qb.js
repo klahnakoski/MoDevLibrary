@@ -94,7 +94,18 @@ Qb.compile = function(query, sourceColumns, useMVEL){
 	var select = Array.newInstance(query.select);
 	for(var s = 0; s < select.length; s++){
 		if (typeof(select[s])=="string") select[s]={"value":select[s]};
-		if (select[s].name===undefined) select[s].name=splitField(select[s].value).last();
+		if (select[s].name===undefined){
+			if (select[s].value===undefined) {
+				select[s].name = select[s].aggregate;
+				select[s].value = ".";
+			}else{
+				select[s].name=splitField(select[s].value).last();
+			}//endif
+		}else{
+			if (select[s].value===undefined) {
+				select[s].value = ".";
+			}//endif
+		}//endif
 		if (uniqueColumns[select[s].name]!==undefined)
 			Log.error("Column with name "+select[s].name+" appeared more than once");
 		select[s].columnIndex=s+edges.length;
@@ -170,7 +181,9 @@ function* calc2Tree(query){
 	var tree = {};
 	query.tree = tree;
 	FROM: for(var i = 0; i < from.length; i++){
-		yield (Thread.yield());
+		if (i%1000==0) {
+			yield (Thread.yield());
+		}//endif
 
 		var row = from[i];
 		//CALCULATE THE GROUP COLUMNS TO PLACE RESULT
@@ -933,9 +946,14 @@ Qb.getColumnsFromQuery=function*(query){
 		} else if (query.from.cube){
 			query.from.list = Qb.Cube2List(query.from);
 			sourceColumns = query.from.columns;
-		}else if (query.from.from!=undefined){
-			query.from=yield (Qb.calc2List(query.from));
-			sourceColumns=yield (Qb.getColumnsFromQuery(query));
+		}else if (query.from.from!=undefined) {
+			query.from = yield (Qb.calc2List(query.from));
+			sourceColumns = yield (Qb.getColumnsFromQuery(query));
+		}else if (query.select !==undefined && query.edges !== undefined){
+			var output = [];
+			output.extend(query.edges.map(Qb.column.normalize));
+			output.extend(query.select.map(Qb.column.normalize));
+			return output;
 		}else{
 			Log.error("Do not know how to handle this");
 		}//endif
@@ -952,20 +970,15 @@ Qb.getColumnsFromList = function(data){
 	if (data.length==0 || typeof(data[0])=="string")
 		return [];
 
-	var output = [];
-	for(var i = 0; i < data.length; i++){
-		//WHAT ABOUT LISTS OF VALUES, WHAT IS THE COLUMN "NAME"
-//		if (typeof data[i] != "object") return ["value"];
-		var keys = Object.keys(data[i]);
-		kk: for(var k = 0; k < keys.length; k++){
-			for(var c = 0; c < output.length; c++){
-				if (output[c].name == keys[k]) continue kk;
-			}//for
-			var column={"name":keys[k], "domain":Qb.domain.value};
-			output.push(column);
-		}//for
+	var output = {};
+	for(var i = 0; i < data.length; i++) {
+		Map.forall(data[i], function(k, v){
+			if (v === undefined || v == null) return;
+			if (output[k]) return;
+			output[k] = {"name": k, "domain": Qb.domain.value};
+		});
 	}//for
-	return output;
+	return Map.values(output);
 };//method
 
 

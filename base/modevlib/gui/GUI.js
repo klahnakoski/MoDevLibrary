@@ -15,9 +15,6 @@ importScript([
 ]);
 
 importScript("Filter.js");
-importScript("ComponentFilter.js");
-importScript("ProductFilter.js");
-importScript("ProgramFilter.js");
 importScript("PartitionFilter.js");
 importScript("TeamFilter.js");
 importScript("RadioFilter.js");
@@ -88,8 +85,11 @@ GUI = {};
 			if (typeof(refreshChart) != "function") {
 				Log.error("Expecting first parameter to be a refresh (creatChart) function");
 			}//endif
-			GUI.refreshChart = refreshChart;
 			GUI.pleaseRefreshLater = coalesce(GUI.pleaseRefreshLater, false);
+			GUI.refreshChart = function(){
+				if (GUI.pleaseRefreshLater) return;
+				refreshChart();
+			};
 
 			//IF THERE ARE ANY CUSTOM FILTERS, THEN TURN OFF THE DEFAULTS
 			var isCustom = false;
@@ -102,36 +102,46 @@ GUI = {};
 				}
 			});
 
-			if (((showDefaultFilters === undefined) && !isCustom) || showDefaultFilters) {
+			function post_filter_functions(){
+				GUI.showLastUpdated(indexName);
+				GUI.AddParameters(parameters, relations); //ADD PARAM AND SET DEFAULTS
+				GUI.Parameter2State();			//UPDATE STATE OBJECT WITH THOSE DEFAULTS
+
+				GUI.makeSelectionPanel();
+
+				GUI.relations = coalesce(relations, []);
+				GUI.FixState();
+
+				GUI.URL2State();				//OVERWRITE WITH URL PARAM
+				GUI.State2URL.isEnabled = true;	//DO NOT ALLOW URL TO UPDATE UNTIL WE HAVE GRABBED IT
+
+				GUI.FixState();
+				GUI.State2URL();
+				GUI.State2Parameter();
+
+				if (!GUI.pleaseRefreshLater) {
+					//SOMETIMES SETUP NEEDS TO BE DELAYED A BIT MORE
+					GUI.refresh();
+				}//endif
+			}//function
+
+			if (window.ProgramFilter===undefined && (((showDefaultFilters === undefined) && !isCustom) || showDefaultFilters)) {
+				GUI.pleaseRefreshLater=true;
 				//USE DEFAULT FILTERS
-				GUI.state.programFilter = new ProgramFilter();
-				GUI.state.productFilter = new ProductFilter();
-				GUI.state.componentFilter = new ComponentFilter();
+				importScript(["ComponentFilter.js", "ProductFilter.js", "ProgramFilter.js"], function(){
+					GUI.state.programFilter = new ProgramFilter();
+					GUI.state.productFilter = new ProductFilter();
+					GUI.state.componentFilter = new ComponentFilter();
 
-				GUI.customFilters.push(GUI.state.programFilter);
-				GUI.customFilters.push(GUI.state.productFilter);
-				GUI.customFilters.push(GUI.state.componentFilter);
-			}//endif
+					GUI.customFilters.push(GUI.state.programFilter);
+					GUI.customFilters.push(GUI.state.productFilter);
+					GUI.customFilters.push(GUI.state.componentFilter);
 
-			GUI.showLastUpdated(indexName);
-			GUI.AddParameters(parameters, relations); //ADD PARAM AND SET DEFAULTS
-			GUI.Parameter2State();			//UPDATE STATE OBJECT WITH THOSE DEFAULTS
-
-			GUI.makeSelectionPanel();
-
-			GUI.relations = coalesce(relations, []);
-			GUI.FixState();
-
-			GUI.URL2State();				//OVERWRITE WITH URL PARAM
-			GUI.State2URL.isEnabled = true;	//DO NOT ALLOW URL TO UPDATE UNTIL WE HAVE GRABBED IT
-
-			GUI.FixState();
-			GUI.State2URL();
-			GUI.State2Parameter();
-
-			if (!GUI.pleaseRefreshLater) {
-				//SOMETIMES SETUP NEEDS TO BE DELAYED A BIT MORE
-				GUI.refresh();
+					GUI.pleaseRefreshLater=false;
+					post_filter_functions();
+				});
+			}else{
+				post_filter_functions();
 			}//endif
 		};
 
@@ -193,7 +203,7 @@ GUI = {};
 					esHasErrorInIndex = false;
 					time = new Date((yield(ESQuery.run({
 						"from":"talos",
-						"select":{"name": "max_date", "value":"datazilla.date_loaded","aggregate":"maximum"}
+						"select":{"name": "max_date", "value":"testrun.date","aggregate":"maximum"}
 					}))).cube.max_date);
 					$("#testMessage").html("Latest Push " + time.addTimezone().format("NNN dd @ HH:mm") + Date.getTimezone());
 				} else {
@@ -544,7 +554,11 @@ GUI = {};
 						GUI.state[param.id]=v.split(",").map(String.trim);
 					}//endif
 				} else {
-					GUI.state[param.id] = $("#" + param.id).val();
+					v = $("#" + param.id).val();
+					if (v===undefined){
+						Log.error("not expected")
+					}//endif
+					GUI.state[param.id] = v;
 				}//endif
 			});
 		};
@@ -626,16 +640,15 @@ GUI = {};
 			$("#summary").html(html);
 		};
 
-		GUI.refreshRequested = false;	//TRY TO AGGREGATE MULTIPLE refresh() REQUESTS INTO ONE
+		GUI.refreshInProgress = false;	//TRY TO AGGREGATE MULTIPLE refresh() REQUESTS INTO ONE
 
 		GUI.refresh = function (refresh) {
-			if (GUI.refreshRequested) return;
-			GUI.refreshRequested = true;
+			if (GUI.refreshInProgress) return;
+			GUI.refreshInProgress = true;
 
 			Thread.run("refresh gui", function*() {
 				yield (Thread.sleep(200));
-				GUI.refreshRequested = false;
-
+				GUI.refreshInProgress = false;
 				GUI.State2URL();
 
 				var threads = [];

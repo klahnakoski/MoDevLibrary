@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-
+importScript("../collections/aArray.js");
 importScript("../util/convert.js");
 
 
@@ -24,7 +24,7 @@ importScript("../util/convert.js");
 	function pythonExcept2Exception(except){
 		var output = new Exception(
 			new Template(except.template).expand(except.params),
-			except.cause===undefined ? undefined : Array.newInstance(except.cause).map(pythonExcept2Exception)
+			Array.newInstance(except.cause).map(pythonExcept2Exception).unwrap()
 		);
 		output.stack = pythonTrace2Stack(except.trace);
 		return output;
@@ -93,7 +93,6 @@ importScript("../util/convert.js");
 		});
 		return new Exception("error called with arguments("+args.join(",\n"+")"), null);
 	};
-
 
 	Exception.prototype.contains=function(type){
 		if (this==type) return true;

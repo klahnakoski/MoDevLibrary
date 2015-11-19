@@ -11,6 +11,7 @@ importScript([
 ]);
 importScript("aException.js");
 importScript("../util/aTemplate.js");
+importScript("../charts/aColor.js");
 
 
 
@@ -73,6 +74,7 @@ var Log = new function(){
 			logHolder.append(log2html(message));
 		});
 	};
+
 
 	try{
 		$(document).ready(function(){
