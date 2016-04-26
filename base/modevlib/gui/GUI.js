@@ -7,14 +7,13 @@ importScript([
 	"../../lib/jquery.js",
 	"../../lib/jquery-ui/js/jquery-ui-1.10.2.custom.js",
 	"../../lib/jquery-ui/css/start/jquery-ui-1.10.2.custom.css",
-	"../../lib/jquery.ba-bbq/jquery.ba-bbq.js",
 	"../../lib/jquery-linedtextarea/jquery-linedtextarea.css",
 	"../../lib/jquery-linedtextarea/jquery-linedtextarea.js",
 	"../../lib/jsonlint/jsl.parser.js",
 	"../../lib/jsonlint/jsl.format.js"
 ]);
 
-importScript("Filter.js");
+importScript("../util/State.js");
 importScript("PartitionFilter.js");
 importScript("TeamFilter.js");
 importScript("RadioFilter.js");
@@ -34,6 +33,11 @@ importScript("../aFormat.js");
 
 GUI = {};
 (function () {
+	if (window.GUI === undefined) {
+		window.GUI = {};
+	}//endif
+	var GUI = window.GUI;
+
 		GUI.state = {};
 		GUI.customFilters = [];
 
@@ -74,7 +78,7 @@ GUI = {};
 			parameters,    //LIST OF PARAMETERS (see GUI.AddParameters FOR DETAILS)
 			relations,     //SOME RULES TO APPLY TO PARAMETERS, IN CASE THE HUMAN MAKES SMALL MISTAKES
 			indexName,     //PERFORM CHECKS ON THIS INDEX
-			showDefaultFilters,  //SHOW THE Product/Compoentn/Team FILTERS
+			showDefaultFilters,  //SHOW THE Product/Component/Team FILTERS
 			performChecks,       //PERFORM SOME CONSISTENCY CHECKS TOO
 			checkLastUpdated     //SEND QUERY TO GET THE LAST DATA?
 		) {
@@ -105,15 +109,15 @@ GUI = {};
 			function post_filter_functions(){
 				GUI.showLastUpdated(indexName);
 				GUI.AddParameters(parameters, relations); //ADD PARAM AND SET DEFAULTS
-				GUI.Parameter2State();			//UPDATE STATE OBJECT WITH THOSE DEFAULTS
+				GUI.Parameter2State();      //UPDATE STATE OBJECT WITH THOSE DEFAULTS
 
 				GUI.makeSelectionPanel();
 
 				GUI.relations = coalesce(relations, []);
 				GUI.FixState();
 
-				GUI.URL2State();				//OVERWRITE WITH URL PARAM
-				GUI.State2URL.isEnabled = true;	//DO NOT ALLOW URL TO UPDATE UNTIL WE HAVE GRABBED IT
+				GUI.URL2State();        //OVERWRITE WITH URL PARAM
+				GUI.State2URL.isEnabled = true;  //DO NOT ALLOW URL TO UPDATE UNTIL WE HAVE GRABBED IT
 
 				GUI.FixState();
 				GUI.State2URL();
@@ -166,14 +170,14 @@ GUI = {};
 					tm.html(new Template("<div style={{style|style}}>{{name}}</div>").expand(result.index));
 					tm.append("<br>ES Last Updated " + time.addTimezone().format("NNN dd @ HH:mm") + Date.getTimezone());
 				} else if (indexName == "reviews") {
-                    var result = yield (ESQuery.run({
-                        "from": "reviews",
-                        "select": [
-                            {"name": "last_request", "value": "request_time", "aggregate": "maximum"}
-                        ]
-                    }));
-                    time = Date.newInstance(result.cube.last_request);
-                    $("#testMessage").html("Reviews Last Updated " + time.addTimezone().format("NNN dd @ HH:mm") + Date.getTimezone());
+										var result = yield (ESQuery.run({
+												"from": "reviews",
+												"select": [
+														{"name": "last_request", "value": "request_time", "aggregate": "maximum"}
+												]
+										}));
+										time = Date.newInstance(result.cube.last_request);
+										$("#testMessage").html("Reviews Last Updated " + time.addTimezone().format("NNN dd @ HH:mm") + Date.getTimezone());
 				} else if (indexName == "bug_tags") {
 					esHasErrorInIndex = false;
 					time = yield (BUG_TAGS.getLastUpdated());
@@ -198,7 +202,7 @@ GUI = {};
 						"from": "perfy",
 						"select": {"name": "max_date", "value": "info.started", "aggregate": "maximum"}
 					}))).cube.max_date);
-					$("#testMessage").html("Perfy Last Updated " + time.addTimezone().format("NNN dd @ HH:mm") + Date.getTimezone());
+					$("#testMessage").html("Builds Last Updated " + time.addTimezone().format("NNN dd @ HH:mm") + Date.getTimezone());
 				}else if (indexName == "talos"){
 					esHasErrorInIndex = false;
 					time = new Date((yield(ESQuery.run({
@@ -264,7 +268,7 @@ GUI = {};
 		GUI.State2URL = function () {
 			if (!GUI.State2URL.isEnabled) return;
 
-			var simplestate = {};
+			var simpleState = {};
 			Map.forall(GUI.state, function (k, v) {
 
 				var p = GUI.parameters.map(function (v, i) {
@@ -272,43 +276,33 @@ GUI = {};
 				})[0];
 
 				if (v.isFilter) {
-					simplestate[k] = v.getSimpleState();
+					simpleState[k] = v.getSimpleState();
 				} else if (jQuery.isArray(v)) {
 					if (v.length > 0) {
-						simplestate[k] = v.join(",");
+						simpleState[k] = v.join(",");
 					}else{
-						simplestate[k] = undefined;
+						simpleState[k] = undefined;
 					}//endif
+				} else if (p && p.type == "boolean") {
+					simpleState[k] = convert.value2json(v == true);
 				} else if (p && p.type == "json") {
 					v = convert.value2json(v);
 					v = v.escape(GUI.urlMap);
-					simplestate[k] = v;
+					simpleState[k] = v;
 				} else if (typeof(v) == "string" || aMath.isNumeric(k)) {
 					v = v.escape(GUI.urlMap);
-					simplestate[k] = v;
+					simpleState[k] = v;
 				}//endif
 			});
 
-			{//bbq REALY NEEDS TO KNOW WHAT ATTRIBUTES TO REMOVE FROM URL
-				var removeList = [];
-				var keys = Object.keys(simplestate);
-				for (var i = keys.length; i--;) {
-					var key = keys[i];
-					var val = simplestate[key];
-					if (val === undefined) removeList.push(key);
-				}//for
-
-				jQuery.bbq.removeState(removeList);
-				jQuery.bbq.pushState(Map.copy(simplestate));
-			}
-
+			Session.URL.setFragment(simpleState);
 		};
 
 		GUI.State2URL.isEnabled = false;
 
 
 		GUI.URL2State = function () {
-			var urlState = jQuery.bbq.getState();
+			var urlState = Session.URL.getFragment();
 			Map.forall(urlState, function (k, v) {
 				if (GUI.state[k] === undefined) return;
 
@@ -316,7 +310,7 @@ GUI = {};
 					if (v.id == k) return v;
 				})[0];
 
-				if (p && Qb.domain.ALGEBRAIC.contains(p.type)) {
+				if (p && qb.domain.ALGEBRAIC.contains(p.type)) {
 					v = v.escape(Map.inverse(GUI.urlMap));
 					GUI.state[k] = v;
 				} else if (p && p.type == "json") {
@@ -326,6 +320,8 @@ GUI = {};
 					} catch (e) {
 						Log.error("Malformed JSON: " + v);
 					}//try
+				} else if (p && p.type == "boolean") {
+					GUI.state[k] = convert.json2value(v);
 				} else if (p && p.type == "text") {
 					v = v.escape(Map.inverse(GUI.urlMap));
 					GUI.state[k] = v;
@@ -470,7 +466,7 @@ GUI = {};
 						if (this.isChanging) return;
 						this.isChanging = true;
 						try {
-							codeDiv = $("#" + param.id);	//JUST TO BE SURE WE GOT THE RIGHT ONE
+							codeDiv = $("#" + param.id);  //JUST TO BE SURE WE GOT THE RIGHT ONE
 							//USE JSONLINT TO FORMAT AND TEST-COMPILE THE code
 							var code = jsl.format.formatJson(codeDiv.val());
 							codeDiv.val(code);
@@ -502,7 +498,7 @@ GUI = {};
 							GUI.refreshChart();
 						}
 					});
-					$("#" + param.id).val(defaultValue.join(","));
+					$("#" + param.id).val(Array.newInstance(defaultValue).join(","));
 				} else {
 					if (param.type == "string") param.type = "text";
 					$("#" + param.id).change(function () {
@@ -640,7 +636,7 @@ GUI = {};
 			$("#summary").html(html);
 		};
 
-		GUI.refreshInProgress = false;	//TRY TO AGGREGATE MULTIPLE refresh() REQUESTS INTO ONE
+		GUI.refreshInProgress = false;  //TRY TO AGGREGATE MULTIPLE refresh() REQUESTS INTO ONE
 
 		GUI.refresh = function (refresh) {
 			if (GUI.refreshInProgress) return;

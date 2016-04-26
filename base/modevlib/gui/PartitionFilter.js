@@ -3,6 +3,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 
+importScript("../util/aString.js");
+
 PartitionFilter = function(){};
 
 
@@ -35,7 +37,7 @@ PartitionFilter.newInstance=function(param){
 
 	if (self.dimension.partitions===undefined && self.dimension.edges===undefined) Log.error(self.dimension.name+" does not have a partition defined");
 
-//	self.id=self.dimension.parent.name.replaceAll(" ", "_");
+//  self.id=self.dimension.parent.name.replaceAll(" ", "_");
 	if (self.treeDepth===undefined) self.treeDepth=100;
 	self.isFilter=true;
 	self.treeDone=false;
@@ -59,16 +61,22 @@ PartitionFilter.newInstance=function(param){
 
 function convertToTreeLater(self, treeNode, dimension){
 	self.numLater++;
+	var refreshNow = GUI.pleaseRefreshLater;
 	GUI.pleaseRefreshLater=true;
 	Thread.run(function*(){
 		//DO THIS ONE LATER
-//		treeNode.children = [];
-		if (dimension.partitions instanceof Thread){
-			var threadResult = yield (Thread.join(dimension.partitions));
-			if (threadResult.threadResponse instanceof Exception){
-				Log.error("Can not setup PartitionFilter", threadResult.threadResponse);
-			}//endif
-		}//while
+//    treeNode.children = [];
+		if (dimension.partitions instanceof Thread) {
+			try {
+				yield (Thread.join(dimension.partitions));
+			} catch (e) {
+				Log.error("Can not setup PartitionFilter", e);
+			}finally{
+				GUI.pleaseRefreshLater = refreshNow;
+			}//try
+		}else{
+			GUI.pleaseRefreshLater = refreshNow;
+		}//endif
 		var pleaseUpdate = (treeNode.children==WAITING_FOR_RESULTS);
 		treeNode.children = dimension.partitions.map(function (v, i) {
 			if (i < coalesce(dimension.limit, DEFAULT_CHILD_LIMIT)){
@@ -148,7 +156,7 @@ PartitionFilter.prototype.getSelectedParts=function(){
 	var self=this;
 
 	return this.selectedIDs.map(function(id){
-		if (id !="__all__")	return self.id2part[id];
+		if (id !="__all__")  return self.id2part[id];
 	});
 };//method
 
@@ -206,15 +214,15 @@ PartitionFilter.prototype.makeTree=function(){
 
 	$(this.FIND_TREE).jstree({
 		"json_data":{
-			"data":self.hierarchy		 //EXPECTING id, name, children FOR ALL NODES IN TREE
+			"data":self.hierarchy     //EXPECTING id, name, children FOR ALL NODES IN TREE
 		},
 		"themes":{
 			"icons":false,
 			"dots":false
 		},
-//		"checkbox":{
-//			"two_state":true
-//		},
+//    "checkbox":{
+//      "two_state":true
+//    },
 		"plugins":[ "themes", "json_data", "ui", "checkbox" ]
 	}).bind("change_state.jstree", function (e, data){
 		if (self.disableUI) return;
@@ -228,7 +236,7 @@ PartitionFilter.prototype.makeTree=function(){
 		}else{
 			//FIRST MAKE A HASH OF CHECKED ITEMS
 			data.inst.get_checked(null, true).each(function(){
-//			$(".jstree-checked").each(function(){
+//      $(".jstree-checked").each(function(){
 				checked[$(this).attr("id")] = true;
 			});
 			//CLICKING ON SOMETHING OTHER THAN ALL WILL CLEAR ALL

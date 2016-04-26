@@ -15,24 +15,15 @@ var Map = {};
 // null IS A VALID VALUE INDICATING THE VALUE IS UNKNOWN
 ////////////////////////////////////////////////////////////////////////////////
 (function(){
-	function splitField(fieldname){
-		try {
-			return fieldname.replaceAll("\\.", "\b").split(".").map(function(v){
-				return v.replaceAll("\b", ".");
-			});
-		} catch (e) {
-			Log.error("Can not split field", e);
-		}//try
-	}//method
-
 	Map.newInstance = function(key, value){
 		var output = {};
 		output[key] = value;
 		return output;
 	};//method
 
-	//LIST OF [k, v] TUPLES EXPECTED
 	Map.zip = function(keys, values){
+		// LIST OF [k, v] TUPLES EXPECTED
+		// OR LIST OF keys AND LIST OF values
 		var output = {};
 
 		if (values === undefined) {
@@ -55,15 +46,15 @@ var Map = {};
 		var keys = Object.keys(from);
 		for (var k = 0; k < keys.length; k++) {
 			var v = from[keys[k]];
-			if (v === undefined) continue;	//DO NOT ADD KEYS WITH NO VALUE
+			if (v === undefined) continue;  //DO NOT ADD KEYS WITH NO VALUE
 			to[keys[k]] = v;
 		}//for
 		return to;
 	};
 
 
-	//IF dest[k]==undefined THEN ASSIGN source[k]
 	Map.setDefault = function(dest){
+	//IF dest[k]==undefined THEN ASSIGN source[k]
 		for (var s = 1; s < arguments.length; s++) {
 			var source = arguments[s];
 			if (source === undefined) continue;
@@ -106,11 +97,13 @@ var Map = {};
 	// ASSUME THE DOTS (.) IN fieldName ARE SEPARATORS
 	// AND THE RESULTING LIST IS A PATH INTO THE STRUCTURE
 	// (ESCAPE "." WITH "\\.", IF REQUIRED)
-	Map.get = function(obj, fieldName){
+	Map.get = function(obj, path){
 		if (obj === undefined || obj == null) return obj;
-		var path = splitField(fieldName);
-		for (var i = 0; i < path.length - 1; i++) {
-			var step = path[i];
+		if (path==".") return obj;
+
+		var pathArray = splitField(path);
+		for (var i = 0; i < pathArray.length; i++) {
+			var step = pathArray[i];
 			if (step == "length") {
 				obj = eval("obj.length");
 			} else {
@@ -118,31 +111,27 @@ var Map = {};
 			}//endif
 			if (obj === undefined || obj == null) return undefined;
 		}//endif
-		return obj[path.last()];
+		return obj;
 	};//method
 
+	Map.set = function(obj, path, value){
+		if (obj === undefined || obj == null || path=="."){
+			Log.error("must be given an object ad field");
+		}//endif
 
-	Map.codomain = function(map){
-		var output = [];
-		var keys = Object.keys(map);
-		for (var i = keys.length; i--;) {
-			var val = map[keys[i]];
-			if (val !== undefined) output.push(val);
-		}//for
-		return output;
-	};//method
-	Map.values = Map.codomain;
-
-	//RETURN KEYS
-	Map.domain = function(map){
-		var output = [];
-		var keys = Object.keys(map);
-		for (var i = keys.length; i--;) {
-			var key = keys[i];
-			var val = map[key];
-			if (val !== undefined) output.push(key);
-		}//for
-		return output;
+		var pathArray = splitField(path);
+		var o = obj;
+		for (var i = 0; i < pathArray.length-1; i++) {
+			var step = pathArray[i];
+			var val = o[step];
+			if (val===undefined || val==null){
+				val={};
+				o[step]=val;
+			}//endif
+			o=val;
+		}//endif
+		o[pathArray[i]]=value;
+		return obj;
 	};//method
 
 
@@ -189,21 +178,22 @@ var Map = {};
 	};
 
 
-	Map.map=function mapAllKey(map, func){
+	function mapAllKey(map, func){
 		//func MUST ACCEPT key, value, index PARAMETERS
 		var output = [];
 		var keys = Object.keys(map);
-		for (var i = keys.length; i--;) {
+		for (var i = 0; i < keys.length; i++) {
 			var key = keys[i];
 			var val = map[key];
 			if (val !== undefined) {
 				var result = func(key, val, i);
-				if (result !== undefined) output.push(result);
+				if (result !== undefined) output.append(result);
 			}//endif
 		}//for
 		return output;
 	};
 
+	Map.map=mapAllKey;
 
 	//RETURN ARRAY OF {"key":key, "value":val} PAIRS
 	Map.getItems = function getItems(map){
@@ -217,24 +207,69 @@ var Map = {};
 			}//endif
 		}//for
 		return output;
-	}//function
+	};//function
 
 
 	Map.getValues = function getValues(map){
 		var output = [];
 		var keys = Object.keys(map);
 		for (var i = keys.length; i--;) {
-			var key = keys[i];
-			var val = map[key];
-			if (val !== undefined) {
-				output.push(val);
-			}//endif
+			var val = map[keys[i]];
+			if (val !== undefined) output.push(val);
 		}//for
 		return output;
 	};
+	Map.codomain = Map.getValues;
+	Map.values = Map.getValues;
 
-	Map.getKeys = Object.keys;
 
+	//RETURN KEYS
+	Map.domain = function(map){
+		var output = [];
+		var keys = Object.keys(map);
+		for (var i = keys.length; i--;) {
+			var key = keys[i];
+			var val = map[key];
+			if (val !== undefined) output.push(key);
+		}//for
+		return output;
+	};//method
+	Map.keys = Map.domain;
+	Map.getKeys = Map.domain;
+
+	//RETURN LEAVES
+	Map.leafItems = function(map){
+		function _leaves(map, prefix){
+			var output = [];
+			var keys = Object.keys(map);
+			for (var i = keys.length; i--;) {
+				var key = keys[i];
+				var val = map[key];
+
+				var fullname = key.replaceAll(".", "\\.");
+				if (prefix) fullname=prefix+"."+fullname;
+
+				if (val==null){
+					//do nothing
+				}else if (Map.isObject(val)){
+					output.extend(_leaves(val, fullname))
+				}else{
+					output.append([fullname, val])
+				}//endif
+			}//for
+			return output;
+		}
+		return _leaves(map, null);
+	};//method
+	Map.getLeafItems = Map.leafItems;
+
+
+
+	Map.isObject = function (val) {
+			if (val === null) { return false;}
+			return ( (typeof val === 'function') || (typeof val === 'object') );
+	};
+	Map.isMap = Map.isObject;
 
 
 })();
@@ -290,6 +325,9 @@ Util.returnNull = function(__row){
 
 
 //POOR IMPLEMENTATION
+/*
+ * @return {string} A Random GUID
+ */
 Util.GUID = function(){
 	return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c){
 		var r = aMath.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
@@ -298,4 +336,39 @@ Util.GUID = function(){
 };//method
 
 
+function splitField(fieldname){
+	try {
+		return fieldname.replaceAll("\\.", "\b").split(".").map(function(v){
+			return v.replaceAll("\b", ".");
+		});
+	} catch (e) {
+		Log.error("Can not split field", e);
+	}//try
+}//method
 
+
+
+deepCopy = function(value) {
+		if (typeof value !== "object" || !value)
+				return value;
+
+	var copy;
+	var k;
+		if (Array.isArray(value)){
+				copy = [];
+				for (k=value.length;k--;) copy[k] = deepCopy(value[k]);
+				return copy;
+		}//endif
+
+		var cons = value.constructor;
+		if (cons === RegExp || cons === Date) return value;
+
+		copy = cons();
+	Map.forall(value, function(k, v){copy[k]=deepCopy(v);});
+	return copy;
+};
+
+
+function isFunction(f){
+	return typeof f === 'function'
+};
