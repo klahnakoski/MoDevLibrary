@@ -154,9 +154,13 @@ ESQuery.NOT_SUPPORTED = "From clause not supported \n{{from}}";
 					info[depth] = currInfo;
 					(function(currInfo, d){
 						attempts[d] = Thread.run("load " + currInfo.name, function*(){
-							var schema = yield (ESQuery.loadSchema(query, indexName, currInfo));
-							if (!schema) Log.error("Could not get schema from " + currInfo.name);
-							yield ([schema, currInfo]);
+							try{
+								var schema = yield (ESQuery.loadSchema(query, indexName, currInfo));
+								if (!schema) Log.error("Could not get schema from " + currInfo.name);
+								yield ([schema, currInfo]);
+							}catch(e){
+								Log.warning("failure loading " + currInfo.name, e)
+							}//try
 						});
 					})(currInfo, depth);
 					currInfo = currInfo.alternate;
@@ -167,7 +171,7 @@ ESQuery.NOT_SUPPORTED = "From clause not supported \n{{from}}";
 				var schema = null;
 				try {
 					var pair = yield (Thread.join(attempts[0], 900));
-					if (pair && is_array(pair)) {
+					if (pair && isArray(pair)) {
 						[schema, currInfo] = pair;
 					}//endif
 				} catch (e) {
@@ -700,11 +704,15 @@ ESQuery.NOT_SUPPORTED = "From clause not supported \n{{from}}";
 		if (edge.domain.isFacet) {
 			//MUST USE THIS' esFacet
 			var condition = coalesce(partition.esfilter, {"and": []});
+			if (!condition.and)	condition = {"and":[condition]};
 
 			if (qb.domain.ALGEBRAIC.contains(edge.domain.type)) {
 				condition.and.push({
 					"range": Map.newInstance(edge.value, {"gte": MVEL.Value2Query(partition.min), "lt": MVEL.Value2Query(partition.max)})
 				});
+			} else if (edge.value === undefined) {
+				//MUST USE THIS' esFacet, AND NOT(ALL THOSE ABOVE)
+				return ESFilter.simplify(partition.esfilter);
 			} else if (edge.domain.type == "set") {
 				condition.and.push({
 					"term": Map.newInstance(edge.value, edge.domain.getKey(partition))

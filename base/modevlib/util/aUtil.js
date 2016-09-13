@@ -16,6 +16,9 @@ var Map = {};
 ////////////////////////////////////////////////////////////////////////////////
 (function(){
 	Map.newInstance = function(key, value){
+		if (key==null){
+			Log.error("expecting a string key")
+		}//endif
 		var output = {};
 		output[key] = value;
 		return output;
@@ -54,9 +57,9 @@ var Map = {};
 
 
 	Map.setDefault = function(dest){
-	//IF dest[k]==undefined THEN ASSIGN source[k]
-		for (var s = 1; s < arguments.length; s++) {
-			var source = arguments[s];
+	//IF dest[k]==undefined THEN ASSIGN arguments[i][k]
+		for (var i = 1; i < arguments.length; i++) {
+			var source = arguments[i];
 			if (source === undefined) continue;
 			var keys = Object.keys(source);
 			for (var k = 0; k < keys.length; k++) {
