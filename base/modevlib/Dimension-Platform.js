@@ -188,10 +188,73 @@ if (!Mozilla) var Mozilla = {"name": "Mozilla", "edges": []};
 					{"not": {"terms": {"cf_status_firefox51": SOLVED}}},
 					{"term": {"cf_tracking_firefox51": "+"}}
 				]}
+			},
+			{
+				"name": "Firefox52",
+				"version": 52,
+				"releaseDate": "Mar 07, 2017",
+				"esfilter": {"and": [
+					{"not": {"terms": {"cf_status_firefox52": SOLVED}}},
+					{"term": {"cf_tracking_firefox52": "+"}}
+				]}
+			},
+			{
+				"name": "Firefox53",
+				"version": 53,
+				"releaseDate": "Apr 18, 2017",
+				"esfilter": {"and": [
+					{"not": {"terms": {"cf_status_firefox53": SOLVED}}},
+					{"term": {"cf_tracking_firefox53": "+"}}
+				]}
+			},
+			{
+				"name": "Firefox54",
+				"version": 54,
+				"releaseDate": "Jun 13, 2017",
+				"esfilter": {"and": [
+					{"not": {"terms": {"cf_status_firefox54": SOLVED}}},
+					{"term": {"cf_tracking_firefox54": "+"}}
+				]}
+			},
+			{
+				"name": "Firefox55",
+				"version": 55,
+				"releaseDate": "Aug 8, 2017",
+				"esfilter": {"and": [
+					{"not": {"terms": {"cf_status_firefox55": SOLVED}}},
+					{"term": {"cf_tracking_firefox55": "+"}}
+				]}
+			},
+			{
+				"name": "Firefox56",
+				"version": 56,
+				"releaseDate": "Oct 3, 2017",
+				"esfilter": {"and": [
+					{"not": {"terms": {"cf_status_firefox56": SOLVED}}},
+					{"term": {"cf_tracking_firefox56": "+"}}
+				]}
+			},
+			{
+				"name": "Firefox57",
+				"version": 57,
+				"releaseDate": "Nov 11, 2017",
+				"esfilter": {"and": [
+					{"not": {"terms": {"cf_status_firefox57": SOLVED}}},
+					{"term": {"cf_tracking_firefox57": "+"}}
+				]}
+			},
+			{
+				"name": "Firefox58",
+				"version": 58,
+				"releaseDate": "Jan 22, 2018",
+				"esfilter": {"and": [
+					{"not": {"terms": {"cf_status_firefox58": SOLVED}}},
+					{"term": {"cf_tracking_firefox58": "+"}}
+				]}
 			}
 		]
 	};
-	releaseTracking.requiredFields = Array.union(releaseTracking.edges.select("esfilter").map(qb.requiredFields));
+	releaseTracking.requiredFields = Array.union(releaseTracking.edges.select("esfilter").mapExists(qb.requiredFields));
 
 	{//FIND CURRENT RELEASE, AND ENSURE WE HAVE ENOUGH RELEASES!
 		var currentRelease = undefined;
@@ -207,7 +270,7 @@ if (!Mozilla) var Mozilla = {"name": "Mozilla", "edges": []};
 	}
 
 	//NOT IN ANY OF THE THREE TRAINS
-	var otherFilter = {"or": releaseTracking.edges.map(function(r, i){
+	var otherFilter = {"or": releaseTracking.edges.mapExists(function(r, i){
 		if (currentRelease.version <= r.version && r.version <= currentRelease.version + 2) return undefined;
 		return r.esfilter;
 	})};
@@ -224,7 +287,7 @@ if (!Mozilla) var Mozilla = {"name": "Mozilla", "edges": []};
 		"name": "Release Tracking - Desktop",
 		"esFacet": true,
 		"requiredFields": releaseTracking.requiredFields,
-		"edges": trains.leftBut(1).map(function(t, track){
+		"edges": trains.leftBut(1).mapExists(function(t, track){
 			var release = releaseTracking.edges[currentRelease.dataIndex + track];
 			return Map.setDefault({}, t, release);
 		})
@@ -243,7 +306,7 @@ if (!Mozilla) var Mozilla = {"name": "Mozilla", "edges": []};
 		"columnName": "train",
 		"isFacet": true,
 		"requiredFields": releaseTracking.requiredFields,
-		"partitions": trains.leftBut(1).map(function(t, track){
+		"partitions": trains.leftBut(1).mapExists(function(t, track){
 			var release = releaseTracking.edges[currentRelease.dataIndex + track];
 			var output = Map.setDefault({}, t, release);
 			return output;

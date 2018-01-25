@@ -294,6 +294,7 @@ build = function(){
 		}//endif
 		if (this.stack.length > 0) {
 			this.keepRunning = false;
+			Thread.isRunning.remove(this);
 			Log.error("Expecting thread " + convert.string2quote(self.name) + " to have dealt with kill() immediately");
 		}//endif
 		if (this.keepRunning){
@@ -496,7 +497,8 @@ build = function(){
 
 		if (immediateResponse === undefined) {
 			if (DEBUG) Log.note("pausing thread " + Thread.currentThread.name + " while joinAny()");
-			yield (Thread.suspend());
+			var delayedResponse = yield (Thread.suspend());
+			yield (delayedResponse);
 		} else {
 			yield (immediateResponse);
 		}//endif
